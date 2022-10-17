@@ -1,7 +1,7 @@
 ---
-title: "![](images/header.png) Choropleth maps in R"
+title: "![](images/header.png) Referencing in Quarto"
 author: "Brendan Clarke, NHS Education for Scotland, [brendan.clarke2@nhs.scot](mailto:brendan.clarke2@nhs.scot)"
-date: "`r Sys.Date()`"
+date: "2022-10-17"
 format: gfm
 ---
 
@@ -9,9 +9,16 @@ format: gfm
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Maps in R
+## Referencing in Quarto
 
-This is a brief overview of creating a choropleth map in R, with particular reference to mapping of Scotland for health, social care, and housing purposes. 
+This is a brief overview of referencing in Quarto and R. It's aimed at the knowledge, information, and data workforce in health, social care, and housing, in Scotland. It covers:
+
++ adding references from DOI or database search using Rstudio's visual Quarto editor
++ manual tidying of reference metadata
++ instructions describing how to add an existing reference list to a Quarto document
++ a brief introduction to using R to automate reference tidying using the `bib2df()` package
++ some examples of simple visualisations using reference data
++ some guidance on changing reference styles
 
 ## About the KIND Learning Network
 

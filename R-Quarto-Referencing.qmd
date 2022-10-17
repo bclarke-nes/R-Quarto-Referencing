@@ -1,0 +1,198 @@
+---
+title: "![](images/header.png) Referencing in Quarto"
+author: "Brendan Clarke, NHS Education for Scotland, [brendan.clarke2@nhs.scot](mailto:brendan.clarke2@nhs.scot)"
+date: "2022-10-17"
+bibliography: [data/references.bib, data/sample.bib]
+---
+
+```{r}
+#| echo: false
+library(pacman)
+p_load(tidyverse, glue, stringr,bib2df, lubridate)
+knitr::opts_chunk$set(echo = T, warning = F, message = F, results = 'asis', fig.width = 7, fig.height = 3)
+```
+
+::: panel-tabset
+## Introduction
+
+Compared to Rmarkdown, Quarto offers greatly improved tools for referencing material. In this tutorial, we'll work through the basic approach, and then suggest some tweaks and refinements.
+
+-   referencing using the Quarto visual editor
+
+-   referencing manually in the Rmarkdown source
+
+-   tweaking and tidying your references
+
+-   doing 'proper' R-work with your reference list
+
+```{r}
+#| include: FALSE
+# writes Quarto code into standalone R script
+try(knitr::purl(basename(knitr::current_input(dir = FALSE))))
+```
+
+## Using the Quarto visual editor
+
+Citations can be inserted from the *Insert* menu at the top of the Visual editor pane:
+
+![](images/paste-66D3E59A.png)
+
+That brings up a range of options for inserting or creating a citation.
+
+![](images/paste-2D3BB1B9.png)
+
+Most usefully, this integrates a direct search from databases, or supplied DOI. Let's try supplying a DOI (10.1080/02698595.2011.574856):
+
+![](images/paste-B42A64D5.png)
+
+That wasn't instant (about 2 seconds), but should be quick enough to be workable as long as you're dealing with small numbers of references. This inserts a citation, and starts building a bibliography and reference list. By default, citations are inserted in the Chicago author-date format - so an in-text citation featuring author surname and year, like this: [@illari2011], with a matching full reference in a References section at the end of the knitted document:
+
+![](images/paste-1209CE1E.png)
+
+Note that this reference isn't perfect, and unfortunately the metadata for many academic publications (particularly older ones) will often need some manual tidying before it's ready for publication. If we look at the journal homepage for this article, we see that there should be an em-dash between "Russo" and "Williamson": ![](images/paste-1DD6D421.png)
+
+We'll need to tidy our reference a bit.
+
+## Cleaning up references
+
+Our references are stored in a .bib file, called "references.bib" by default. We can see and open this from the Rstudio file browser:
+
+![](images/paste-09C80C20.png)
+
+Editing this directly in Rstudio is feasible if you're fairly confident about the different parts of a .bib, and have a smallish number of references to tidy:
+
+![](images/paste-EB341B58.png)
+
+We can see here that the problem with the title in the reference list is R's fault, rather than the publisher, because the en-dash has been coded using a LaTex tag. We can fix that by replacing `[\textendash]` with `–`, and re-rendering our document:
+
+![](images/paste-A2AC7233.png)
+
+## Adding our own reference list
+
+Often, we'll have some references in a standalone doc that we want to add to a document. We can do this easily if we have a BibTex (.bib) file, by a) putting our reference file somewhere in our project directory, and then b) referencing it in the YAML header with the appropriate path:
+
+![](images/paste-C89643AD.png)
+
+If you're working with a very complicated set of references, it's possible to add multiple bibliography files to your header:
+
+![](images/paste-7D18884A.png)
+
+As far as I can tell, as long as there are no identical citation keys in these files, you should be able to work seamlessly across these.
+
+## Scaling tidying references
+
+Manual tidying scales badly. Imagine that we have a lot of wonky references to sort out (like the supplied `sample.bib`). We can speed things up somewhat by loading them into R and using the tools that R provides. We'll need the `bib2df` package to do this:
+
+```{r}
+#| fig-cap: "That scrambled x-axis means that we have some tidying up of this data to do."
+working_bib <- bib2df("data/sample.bib")
+
+working_bib %>%
+  count(YEAR) %>%
+  ggplot() +
+  geom_col(aes(x=YEAR, y=n))
+```
+
+`bib2df()` reads a bibtex file as a tibble. These are very wide (ours is `r dim(working_bib)[2]` columns), meaning that they aren't great for display purposes directly. However, the first few columns give us a good indication of their general structure:
+
+```{r}
+head(working_bib) %>% select(1:5) %>% knitr::kable()
+```
+
+We've effectively transformed each bibtex field into a column, and each publication into a row, meaning that we're close to having [tidy data](https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-data.html).
+
+We can use this sample bibliography as a test-bed for tidying bibliographic data in R. Let's have a closer look at the different `YEAR` values:
+
+```{r}
+#| results: markup
+working_bib %>%
+  arrange(YEAR) %>%
+  distinct(YEAR) %>%
+  pull()
+```
+
+You can see that there are a couple of non-standard values in the YEAR column. I think what's happened here is that the originator of this bibliography created some non-standard YEARs to quickly reference very old texts with much later standard editions. In defence of younger-me, this was a fairly standard LaTex workaround, and can often be found in older bibliographies. Properly, though, the older year should be in the ORIGYEAR column, and the edition year in the YEAR. We can easily fix this with some `tidyr` and `dplyr`:
+
+```{r}
+working_bib <- working_bib %>%
+  separate(YEAR, into=c("YEAR", "ORIGYEAR"), sep = " ") %>%
+  mutate(ORIGYEAR = str_replace_all(ORIGYEAR, "\\(|\\)", ""))
+```
+
+Other tools that might be useful:
+
+-   `str_replace_all()`
+-   `str_to_title()` or `str_to_lower()`
+-   `str_trim()` to clear out excess white space
+-   various lubridate functions to tidy dates
+
+And a bit of tidying means that we can use this bibligraphic data to add useful context to our report:
+
+```{r}
+working_bib %>%
+  mutate(YEAR = as.numeric(YEAR)) %>%
+  filter(YEAR >= 1900) %>%
+  ggplot() +
+  geom_histogram(aes(x=YEAR, fill=CATEGORY), binwidth=5)
+```
+
+Once we've tidied this data, we can write the tibble back to a .bib file using `df2bib()`:
+
+```{r}
+#| eval: false
+df2bib(working_bib, "data/tidy.bib")
+```
+
+A word of warning about this kind of tidying: I would strongly suggest not doing this in Quarto itself. While experimenting with this, I haven't been able to pin down exactly when the evaluation of the bibliography in the YAML header happens, and so the results were sometimes inconsistent. So this sort of tidying would be better housed in a standalone R script, and care taken to ensure that the references are right before rendering your Quarto document.
+
+## Adding references manually
+
+You can add references from an existing reference document. To do this, you need the citation key of the work you'd like to reference. For [@illari2011] that we retrieved earlier by DOI search, that reference key is `illari2011`. An in-text citation can be added using `[@illari2011]` in the source code.
+
+If you're working in the visual editor, you can also add an in-text citation to a DOI, which will allow you to add the work to your bibliography directly:
+
+-   in the Visual editor, type an opening square-bracket and an `@`
+
+    ![](images/paste-11B5C943.png)
+
+-   Add your DOI, which will bring up a lookup:
+
+    ![](images/paste-3F9A6D52.png)
+
+-   Complete the details and OK to complete your in-text citation [@hoppania2022]
+
+    If you're working with a supplied reference list from a bibtex file, the Visual Quarto editor provides an explorer tool for your bibliography:
+
+![](images/paste-0071EED8.png)
+
+Selecting one of these references will insert an in-text citation - or you can copy the reference key and insert one manually. That might be useful if you'd like to vary the style of the in-text citation. [Following the Quarto guidance](https://quarto.org/docs/authoring/footnotes-and-citations.html):
+
+-   use semicolons to add multiple citations - `[@xie2020; @illari2011]`: [@xie2020; @illari2011]
+
+-   include explanatory notes within the brackets - `[see especially @illari2011]`: [see especially @illari2011]
+
+-   suppress author name with `-` - `Illari [-@illari2011]`: Illari [-@illari2011]
+
+-   you can add a `nocite` field (using the Source editor) to include items in the bibliography without referencing them in the text
+
+    ![](images/paste-DAC47D90.png)
+
+---
+nocite: |
+  @henman2018
+---
+
+## Reference styles
+
+These are changed in broadly same way as you'd change the bibliography file itself. More details on this can be found in the references chapter of the *R Markdown Cookbook* [@xie2020], but the quick version is:
+
+-   reference style is controlled by a csl file
+
+-   adding the line `cls: [somestyle.csl]` will change from the [default Chicago referencing style](https://quarto.org/docs/authoring/footnotes-and-citations.html). I've included here two sample style files for BioMed Central and OSCOLA here, and you can try these out by adding the line `csl: styles/oscola.csl` and `csl: styles/biomed-central.csl` respectively to the YAML header:
+
+    ![](images/paste-25CB7CA2.png)
+
+-   .csl files are XML that describe the way that references should be displayed
+
+-   it is possible to write your own csl, although much more conveniently, these can be downloaded from the [CSL project](https://citationstyles.org/), as the sample .csl files here have been
+:::
