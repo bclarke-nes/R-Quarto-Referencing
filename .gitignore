@@ -2,7 +2,7 @@
 *.pdf
 *.docx
 /archive
-/R-maps_*
+/R-Quarto-Referencing_*
 _quarto.yml
 readme_*
 
